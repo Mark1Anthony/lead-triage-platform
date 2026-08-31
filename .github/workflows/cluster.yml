@@ -108,10 +108,32 @@ jobs:
       - name: What went wrong
         if: failure()
         run: |
-          kubectl -n lead-triage get pods,svc,ingress,pvc
-          kubectl -n lead-triage describe pods
-          kubectl -n lead-triage logs -l app.kubernetes.io/name=lead-triage --tail=100 || true
-          kubectl -n lead-triage logs -l app.kubernetes.io/name=postgres --tail=50 || true
+          echo "── workloads"
+          kubectl -n lead-triage get pods,svc,ingress,pvc -o wide
+          kubectl -n lead-triage logs -l app.kubernetes.io/name=lead-triage --tail=50 || true
+          kubectl -n lead-triage logs -l app.kubernetes.io/name=postgres --tail=30 || true
+
+          echo "── network policies, and the labels they select on"
+          kubectl -n lead-triage get networkpolicy -o yaml
+          kubectl get ns --show-labels
+
+          echo "── ingress controller"
+          kubectl -n ingress-nginx get pods -o wide
+          kubectl -n ingress-nginx logs -l app.kubernetes.io/component=controller --tail=50 || true
+
+          # Reaching the service from inside the namespace separates a blocked
+          # ingress controller from an application that is not serving at all.
+          echo "── from inside the cluster"
+          kubectl -n lead-triage run probe --rm -i --restart=Never             --image=curlimages/curl:8.10.1 --command --             curl -sS -m 10 -o /dev/null -w 'in-namespace: %{http_code}
+'             http://lead-triage/health || true
+
+          # And once more with the policy out of the way. If this succeeds and
+          # the one above did not, the policy is the answer.
+          echo "── with the policy removed"
+          kubectl -n lead-triage delete networkpolicy --all
+          sleep 5
+          curl -sS -m 10 -o /dev/null -w 'through ingress: %{http_code}
+'             -H 'Host: lead-triage.localtest.me' http://localhost/health || true
 
       - name: Tear down
         if: always()
