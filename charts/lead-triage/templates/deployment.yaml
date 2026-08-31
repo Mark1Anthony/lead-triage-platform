@@ -4,6 +4,13 @@ metadata:
   name: {{ include "lead-triage.fullname" . }}
   labels:
     {{- include "lead-triage.labels" . | nindent 4 }}
+  annotations:
+    checkov.io/skip1: CKV_K8S_11=No CPU limit on purpose. Throttling a request that is already within its memory budget only adds latency; memory is limited because exceeding it is a bug.
+    checkov.io/skip2: CKV_K8S_15=Always would re-pull on every restart. The pipeline deploys an immutable tag, so the image behind it cannot change.
+    checkov.io/skip3: CKV_K8S_21=The namespace comes from Terraform, not the chart. Rendering without one is what makes this look like the default namespace.
+    checkov.io/skip4: CKV_K8S_35=The application reads its configuration from the environment. Mounting secrets as files would mean changing the application to suit the scanner.
+    checkov.io/skip5: CKV_K8S_40=The image creates its user with uid 1000. A higher uid has to be set when the image is built, not when it is deployed.
+    checkov.io/skip6: CKV_K8S_43=CI resolves the tag to a digest before deploying; the chart takes what it is given.
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}

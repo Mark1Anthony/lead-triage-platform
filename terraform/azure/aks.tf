@@ -39,6 +39,12 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   azure_active_directory_role_based_access_control {
     azure_rbac_enabled = true
+    tenant_id          = data.azurerm_client_config.current.tenant_id
+
+    # Members of these groups are cluster administrators. Empty means only
+    # Azure RBAC role assignments grant access, which is the stricter default -
+    # there is no standing admin group to belong to.
+    admin_group_object_ids = var.aks_admin_group_object_ids
   }
 
   default_node_pool {

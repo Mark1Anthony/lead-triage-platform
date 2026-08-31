@@ -67,6 +67,12 @@ variable "github_repository" {
   default     = "Mark1Anthony/lead-triage-platform"
 }
 
+variable "aks_admin_group_object_ids" {
+  description = "Entra ID groups whose members administer the cluster. Empty relies on Azure RBAC alone."
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "Applied to everything, so a stray resource can be traced back."
   type        = map(string)

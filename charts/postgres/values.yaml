@@ -21,3 +21,8 @@ resources:
     memory: 128Mi
   limits:
     memory: 512Mi
+
+networkPolicy:
+  enabled: true
+  # Label value of the workload allowed to connect.
+  clientName: lead-triage

@@ -1,0 +1,31 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress, Egress]
+
+  ingress:
+    # Only the application. A database that accepts connections from anything
+    # in the namespace is one lateral step away from any other compromised pod.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Values.networkPolicy.clientName }}
+      ports:
+        - port: 5432
+          protocol: TCP
+
+  # No egress rules at all: with Egress in policyTypes and nothing listed,
+  # everything outbound is denied. Postgres serves requests, it does not make
+  # them.
+  egress: []
+{{- end }}

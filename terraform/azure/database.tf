@@ -63,6 +63,10 @@ resource "azurerm_key_vault_secret" "database_url" {
   # A secret with no expiry is one nobody revisits. A year is long enough not
   # to be busywork, short enough that a forgotten credential surfaces while
   # someone still remembers what it was for.
+  # Says what the value is without revealing it, so an operator browsing the
+  # vault does not have to read a secret to find out what it is for.
+  content_type = "PostgreSQL connection URI"
+
   expiration_date = timeadd(timestamp(), "8760h")
 
   lifecycle {
