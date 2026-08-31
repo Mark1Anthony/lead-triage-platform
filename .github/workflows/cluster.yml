@@ -42,11 +42,20 @@ jobs:
 
       - name: Install the ingress controller
         run: |
+          # Pinned to a release rather than main: a manifest from a moving
+          # branch makes every run depend on what upstream merged that morning.
           kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.13.0/deploy/static/provider/kind/deploy.yaml
-          kubectl wait --namespace ingress-nginx \
-            --for=condition=ready pod \
-            --selector=app.kubernetes.io/component=controller \
-            --timeout=180s
+
+          # rollout status rather than waiting on a pod condition: the admission
+          # webhook jobs run first and the controller image is large, so on a
+          # cold runner this takes longer than the 180s it used to be given -
+          # which is how this step failed once with nothing wrong.
+          kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=300s
+
+          # Ready is still not serving. The webhook has to be reachable before
+          # an Ingress can be admitted at all.
+          kubectl -n ingress-nginx wait --for=condition=complete job \
+            --selector=app.kubernetes.io/component=admission-webhook --timeout=180s
 
       - name: Build the image and load it into the cluster
         run: |
@@ -63,20 +72,14 @@ jobs:
         working-directory: terraform/cluster
         run: |
           terraform init -input=false
-          # Network policies off here, and only here. kind's CNI accepts them
-          # and then drops traffic a correct policy permits - proven by deleting
-          # them mid-run and watching the same request return 200. Calico, which
-          # does enforce them properly, breaks the ingress controller's hostPort
-          # inside kind, so neither option tests the policies honestly.
-          #
-          # They stay on by default in the chart, they are rendered and
-          # schema-checked by the Validate workflow, and the AKS design runs
-          # Calico where they are enforced for real. What this job does not do
-          # is test them, and pretending otherwise would be worse than saying so.
+          # Network policies stay on. They were switched off here after a run
+          # where deleting them appeared to fix the ingress path - but that test
+          # also waited ten seconds, and the controller turning out to be slow
+          # to become ready makes the wait the likelier explanation. This run
+          # decides it.
           terraform apply -auto-approve -input=false \
             -var 'image_repository=lead-triage' \
             -var 'image_tag=ci' \
-            -var 'network_policy_enabled=false'
 
       - name: The service answers, on Postgres
         run: |
