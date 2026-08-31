@@ -55,7 +55,7 @@ flowchart TB
 | Kubernetes beyond `kubectl apply` | [`charts/`](charts) — probes, HPA, disruption budget, topology spread, read-only root filesystem |
 | CI/CD | [`.github/workflows/`](.github/workflows) — build, deploy, verify, tear down |
 | Secret handling | No credential is committed. Terraform generates them; Azure uses OIDC and workload identity, so there is nothing to rotate |
-| Observability | Log Analytics and Container Insights in Azure; Prometheus rules and Grafana dashboards in [`observability/`](observability) |
+| Observability | Log Analytics, Container Insights and a spending budget with alerts in [`terraform/azure/observability.tf`](terraform/azure/observability.tf). Metrics and dashboards are the next piece and are not here yet |
 | Cost control | A budget with alerts at 80% actual and 100% forecast, because Azure enforces no cap |
 | Judgement | [`docs/adr/`](docs/adr) — the decisions, including the ones that went the boring way |
 
@@ -112,7 +112,6 @@ terraform/
   cluster/         What actually runs. Namespace, generated secrets, releases
   azure/           The production design: AKS, PostgreSQL, Key Vault, OIDC
 kind/              Cluster definition — three nodes, ingress ports published
-observability/     Alert rules and dashboards, as files rather than clicks
 .github/workflows/ validate.yml (static checks) · cluster.yml (deploy and prove)
 docs/adr/          Why things are the way they are
 scripts/           One-time bootstrap for the Azure remote state
