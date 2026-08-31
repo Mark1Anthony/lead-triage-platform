@@ -131,12 +131,24 @@ jobs:
             http://localhost/api/leads)
           [ "$code" = "200" ] || { echo "expected 200 with the token, got $code"; exit 1; }
 
-      - name: Rolling update keeps serving
+      - name: Serving again after a rolling restart
         run: |
           kubectl -n lead-triage rollout restart deployment/lead-triage
           kubectl -n lead-triage rollout status deployment/lead-triage --timeout=180s
-          curl -fsS -H 'Host: lead-triage.localtest.me' http://localhost/health > /dev/null \
-            || { echo "the service did not survive a restart"; exit 1; }
+
+          # rollout status returns once the new pods are ready; the ingress
+          # controller refreshes its endpoint list a moment after that, so an
+          # immediate request can still get a 502. This asserts that the service
+          # comes back - not that there was no gap. Claiming zero downtime would
+          # be claiming something this setup does not deliver, and a test that
+          # says so is worth more than one that looks better.
+          for i in $(seq 1 20); do
+            curl -fsS -m 5 -H 'Host: lead-triage.localtest.me' http://localhost/health > /dev/null && break
+            sleep 3
+          done
+
+          curl -fsS -m 5 -H 'Host: lead-triage.localtest.me' http://localhost/health > /dev/null \
+            || { echo "did not come back after the restart"; exit 1; }
 
       - name: What went wrong
         if: failure()
