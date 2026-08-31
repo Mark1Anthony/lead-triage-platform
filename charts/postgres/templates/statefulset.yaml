@@ -22,6 +22,8 @@ spec:
         runAsNonRoot: true
         runAsUser: 70          # postgres in the alpine image
         fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: postgres
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -54,9 +56,26 @@ spec:
             periodSeconds: 20
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql
+            # With the root filesystem read-only, the two directories Postgres
+            # writes outside its data directory need mounts of their own: the
+            # unix socket, and scratch space for sorts that exceed work_mem.
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
   {{- if .Values.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:

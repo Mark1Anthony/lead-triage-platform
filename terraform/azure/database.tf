@@ -10,6 +10,13 @@ resource "azurerm_postgresql_flexible_server" "this" {
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
 
+  # Already private: the server has no public endpoint, it joins the delegated
+  # subnet and resolves through the private zone. Checkov looks for a private
+  # endpoint resource and does not recognise VNet integration, which reaches
+  # the same result by a different mechanism.
+  #checkov:skip=CKV2_AZURE_57:Private through VNet integration - see delegated_subnet_id below.
+  #checkov:skip=CKV_AZURE_136:Geo-redundant backups require a General Purpose tier; this runs on Burstable.
+
   version    = "16"
   sku_name   = var.postgres_sku
   storage_mb = 32768
@@ -52,6 +59,17 @@ resource "azurerm_key_vault_secret" "database_url" {
     azurerm_postgresql_flexible_server.this.fqdn,
     azurerm_postgresql_flexible_server_database.leads.name,
   )
+
+  # A secret with no expiry is one nobody revisits. A year is long enough not
+  # to be busywork, short enough that a forgotten credential surfaces while
+  # someone still remembers what it was for.
+  expiration_date = timeadd(timestamp(), "8760h")
+
+  lifecycle {
+    # timestamp() moves on every plan; without this the secret would be
+    # proposed for replacement forever.
+    ignore_changes = [expiration_date]
+  }
 
   depends_on = [azurerm_role_assignment.terraform_manages_secrets]
 }

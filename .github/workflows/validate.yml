@@ -3,6 +3,12 @@ name: Validate
 # Static checks. These run in seconds and catch the mistakes that would
 # otherwise only show up halfway through a deployment.
 
+# The workflow token needs to read this repository and nothing else. Left
+# unset it inherits write access to everything the repository has, which is
+# more than any job here uses.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]

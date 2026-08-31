@@ -53,3 +53,11 @@ podDisruptionBudget:
 serviceMonitor:
   enabled: false
   interval: 30s
+
+networkPolicy:
+  enabled: true
+  # Namespace the ingress controller runs in, matched by the label Kubernetes
+  # sets on every namespace itself.
+  ingressNamespace: ingress-nginx
+  # Live mode calls the OpenAI API; demo mode makes no outbound request.
+  allowExternalEgress: false

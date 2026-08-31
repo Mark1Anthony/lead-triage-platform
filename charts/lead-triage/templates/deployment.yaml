@@ -22,6 +22,9 @@ spec:
         # is applied but never picked up, because the pod spec is unchanged.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
+      # The application never calls the Kubernetes API, so it gets no token to
+      # call it with.
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

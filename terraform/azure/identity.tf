@@ -7,6 +7,10 @@ resource "azurerm_key_vault" "this" {
   tenant_id           = data.azurerm_client_config.current.tenant_id
   sku_name            = "standard"
 
+  #checkov:skip=CKV_AZURE_109:Denying public access by default would lock out the same GitHub-hosted runner that writes the secret. The consistent answer, here as for the API server, is a runner inside the VNet.
+  #checkov:skip=CKV_AZURE_189:Same trade as above.
+  #checkov:skip=CKV2_AZURE_32:A private endpoint only helps once the writer is already inside the network; see above.
+
   # RBAC rather than the older access policies: permissions are then granted
   # the same way as everywhere else in Azure, and show up in the same audit.
   enable_rbac_authorization = true

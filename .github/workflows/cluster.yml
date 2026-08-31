@@ -4,6 +4,12 @@ name: Cluster
 # with Terraform and checks it actually serves traffic - then tears it down.
 # Everything here runs on GitHub's free runners; no cloud resources are created.
 
+# The workflow token needs to read this repository and nothing else. Left
+# unset it inherits write access to everything the repository has, which is
+# more than any job here uses.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
