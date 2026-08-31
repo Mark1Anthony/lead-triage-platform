@@ -68,11 +68,11 @@ jobs:
         working-directory: terraform/cluster
         run: |
           terraform init -input=false
-          # Network policies stay on. They were switched off here after a run
-          # where deleting them appeared to fix the ingress path - but that test
-          # also waited ten seconds, and the controller turning out to be slow
-          # to become ready makes the wait the likelier explanation. This run
-          # decides it.
+          # Network policies on. They were blamed for a failing ingress path
+          # and switched off, on the strength of a check that deleted them and
+          # then slept ten seconds before retrying. The sleep was doing the
+          # work: the controller was slow to become ready, and once its wait
+          # was fixed this passes with the policies in place.
           terraform apply -auto-approve -input=false \
             -var 'image_repository=lead-triage' \
             -var 'image_tag=ci'

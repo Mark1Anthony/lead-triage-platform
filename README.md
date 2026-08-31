@@ -68,7 +68,7 @@ Portfolio repositories are easy to overstate, so:
 | Kubernetes deployment | **Runs.** Every push creates a three-node cluster, deploys, and fails the build if the service does not answer |
 | `terraform/cluster/` | **Applied for real** in that job, then destroyed |
 | Charts | **Rendered and schema-checked**, then actually installed |
-| NetworkPolicies | **Not tested.** kind's CNI accepts them and drops traffic they permit; Calico enforces them correctly but breaks the ingress controller inside kind. They are on by default in the charts and off in that one job |
+| NetworkPolicies | **Installed and traffic flows through them** in that job. What is not proven is that they *block* what they should — that needs a cluster whose CNI enforces them, which kind's does not |
 | `terraform/azure/` | **Not applied.** Validated, linted and scanned on every push. Applying it creates billable resources, which is a deliberate no |
 
 The Azure configuration is written to be applied, not to look like it could be.
