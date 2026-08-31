@@ -68,7 +68,7 @@ Portfolio repositories are easy to overstate, so:
 | Kubernetes deployment | **Runs.** Every push creates a three-node cluster, deploys, and fails the build if the service does not answer |
 | `terraform/cluster/` | **Applied for real** in that job, then destroyed |
 | Charts | **Rendered and schema-checked**, then actually installed |
-| NetworkPolicies | **Installed and traffic flows through them** in that job. What is not proven is that they *block* what they should — that needs a cluster whose CNI enforces them, which kind's does not |
+| NetworkPolicies | **Installed**, and the service serves with them in place. Whether they *block* what they should is untested — an unenforced policy looks identical from outside |
 | `terraform/azure/` | **Not applied.** Validated, linted and scanned on every push. Applying it creates billable resources, which is a deliberate no |
 
 The Azure configuration is written to be applied, not to look like it could be.
