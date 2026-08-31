@@ -42,7 +42,7 @@ jobs:
 
       - name: Install the ingress controller
         run: |
-          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.13.0/deploy/static/provider/kind/deploy.yaml
           kubectl wait --namespace ingress-nginx \
             --for=condition=ready pod \
             --selector=app.kubernetes.io/component=controller \
@@ -69,8 +69,17 @@ jobs:
 
       - name: The service answers, on Postgres
         run: |
+          # The controller picks up endpoints asynchronously after the release
+          # lands, so wait for them rather than racing them.
           for i in $(seq 1 30); do
-            health=$(curl -fsS -H 'Host: lead-triage.localtest.me' http://localhost/health) && break
+            [ -n "$(kubectl -n lead-triage get endpointslice -l kubernetes.io/service-name=lead-triage -o jsonpath='{.items[*].endpoints[*].addresses[0]}')" ] && break
+            sleep 2
+          done
+
+          # Retries have to survive a reset, not only a refusal: this job failed
+          # twice that way on code that then passed twice unchanged.
+          for i in $(seq 1 45); do
+            health=$(curl -fsS -m 5 -H 'Host: lead-triage.localtest.me' http://localhost/health) && break
             sleep 4
           done
           echo "$health"
