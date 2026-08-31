@@ -1,0 +1,25 @@
+# Repository-wide scanner configuration.
+#
+# Everything else is handled where it belongs - a #checkov:skip comment on the
+# Terraform resource, or a checkov.io/skip annotation on the Kubernetes object,
+# each with the reason next to the code it concerns. This file holds the one
+# exception that is not a property of any single resource.
+
+framework:
+  - terraform
+  - kubernetes
+  - helm
+  - github_actions
+
+skip-check:
+  # CKV_K8S_21 - "the default namespace should not be used".
+  #
+  # Nothing here is deployed to the default namespace. terraform/cluster
+  # creates the namespace and installs both releases into it, and the Azure
+  # design does the same. The finding appears because Checkov renders the
+  # charts on their own, and a chart rendered without a namespace reports the
+  # default one - it is describing how it read the files, not how they run.
+  #
+  # Annotating every namespaced object in both charts would answer the scanner
+  # and tell a reader nothing, so the exception is stated once, here.
+  - CKV_K8S_21

@@ -58,7 +58,7 @@ jobs:
         uses: bridgecrewio/checkov-action@master
         with:
           directory: .
-          framework: terraform,kubernetes,helm,github_actions
+          config_file: .checkov.yaml
           quiet: true
           output_format: cli
           soft_fail: false
