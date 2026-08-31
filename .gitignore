@@ -1,0 +1,23 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+# State holds generated passwords in clear text - see docs/adr/0003.
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+
+# .terraform.lock.hcl is deliberately NOT ignored: it pins provider versions
+# and their checksums, which is what makes a plan reproducible. Generate it for
+# every platform the repo is used on with
+#   terraform providers lock -platform=linux_amd64 -platform=windows_amd64
+
+# Helm
+charts/**/charts/
+*.tgz
+
+# Local
+.env
+*.kubeconfig

@@ -1,0 +1,15 @@
+apiVersion: v2
+name: lead-triage
+description: Lead intake and classification service
+type: application
+
+# Chart version, bumped when the templates change.
+version: 0.1.0
+
+# Version of the application this chart deploys by default. values.yaml can
+# override the tag; this is what ships when nothing does.
+appVersion: "1.0.0"
+
+home: https://github.com/Mark1Anthony/lead-triage
+sources:
+  - https://github.com/Mark1Anthony/lead-triage

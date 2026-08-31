@@ -1,0 +1,20 @@
+{{ .Chart.Name }} {{ .Chart.AppVersion }} is installed as {{ .Release.Name }}.
+
+{{- if .Values.ingress.enabled }}
+
+  http://{{ .Values.ingress.host }}
+
+{{- else }}
+
+No ingress. To reach it from your machine:
+
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "lead-triage.fullname" . }} 8000:{{ .Values.service.port }}
+
+{{- end }}
+
+Check which database it picked up:
+
+  curl -s http://{{ .Values.ingress.host }}/health
+
+"database" is "postgres" when DATABASE_URL reached the pod, and "sqlite" when it
+did not - which on a cluster means the secret is missing or misnamed.

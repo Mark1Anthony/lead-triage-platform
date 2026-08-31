@@ -1,0 +1,92 @@
+name: Validate
+
+# Static checks. These run in seconds and catch the mistakes that would
+# otherwise only show up halfway through a deployment.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Formatting
+        run: terraform fmt -check -recursive
+
+      - name: Syntax and provider schemas
+        run: |
+          # Both configurations, without touching any backend or credentials.
+          for dir in terraform/cluster terraform/azure; do
+            echo "── $dir"
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+          done
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Lint
+        run: |
+          tflint --init
+          tflint --recursive --minimum-failure-severity=warning
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the Terraform and the rendered Kubernetes manifests, and reports
+      # things that are valid but unwise: public storage, missing encryption,
+      # containers running as root.
+      - name: Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform,kubernetes,helm,github_actions
+          quiet: true
+          output_format: cli
+          soft_fail: false
+
+  charts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      - name: Lint
+        run: |
+          helm lint charts/lead-triage
+          helm lint charts/postgres
+
+      # Rendering is not enough - a chart can render YAML that the API server
+      # rejects. kubeconform checks the output against the real schemas.
+      - name: Render and check against the Kubernetes schemas
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C /tmp kubeconform
+
+          for chart in charts/*/; do
+            echo "── $chart"
+            helm template release "$chart" \
+              | /tmp/kubeconform -strict -summary -ignore-missing-schemas -
+          done
+
+      - name: The autoscaled path renders too
+        run: |
+          # The default values disable the HPA branch, so it would never be
+          # checked otherwise.
+          helm template release charts/lead-triage \
+            --set autoscaling.enabled=true \
+            --set serviceMonitor.enabled=true \
+            | /tmp/kubeconform -strict -summary -ignore-missing-schemas -

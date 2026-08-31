@@ -1,0 +1,55 @@
+image:
+  repository: ghcr.io/mark1anthony/lead-triage
+  # Empty means "use the chart's appVersion". CI overrides it with the digest
+  # of the image it just built, so a rollout is tied to an exact build rather
+  # than to whatever :latest points at right now.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+# The app reads these; see the lead-triage repo's .env.example.
+config:
+  mode: demo
+  openaiModel: gpt-4o-mini
+
+# Secrets are never in this file. The chart reads them from an existing Secret,
+# which Terraform creates from values that live outside the repository.
+existingSecret: lead-triage-secrets
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: lead-triage.localtest.me
+  # localtest.me resolves to 127.0.0.1 for everyone, so this works against a
+  # local cluster without touching /etc/hosts.
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    # No CPU limit on purpose: throttling a web service that is already within
+    # its memory budget only adds latency. Memory is limited because exceeding
+    # it is a bug, not a busy moment.
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+# Keep at least one pod serving during a node drain.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Scrape config for the Prometheus operator. Off unless it is installed.
+serviceMonitor:
+  enabled: false
+  interval: 30s

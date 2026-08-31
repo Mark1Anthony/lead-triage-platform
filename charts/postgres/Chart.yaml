@@ -1,0 +1,8 @@
+apiVersion: v2
+name: postgres
+description: >
+  Single-instance PostgreSQL for the local cluster. Stands in for Azure Database
+  for PostgreSQL, which is what terraform/azure describes for production.
+type: application
+version: 0.1.0
+appVersion: "18"

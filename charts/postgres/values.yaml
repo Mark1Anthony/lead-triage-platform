@@ -1,0 +1,23 @@
+image:
+  repository: postgres
+  # Same major version as the managed instance in terraform/azure, so a query
+  # that works here works there.
+  tag: "18-alpine"
+
+auth:
+  database: leads
+  username: leads
+  # The password comes from a Secret that Terraform creates. Never from here.
+  existingSecret: postgres-credentials
+  secretKey: password
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi

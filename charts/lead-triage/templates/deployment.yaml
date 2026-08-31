@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "lead-triage.fullname" . }}
+  labels:
+    {{- include "lead-triage.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  {{- /* With the HPA on, replicas is left unset so Helm does not fight it back
+         to the chart's value on every upgrade. */}}
+  selector:
+    matchLabels:
+      {{- include "lead-triage.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "lead-triage.labels" . | nindent 8 }}
+      annotations:
+        # Rolls the pods when the config changes. Without this a ConfigMap edit
+        # is applied but never picked up, because the pod spec is unchanged.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: {{ include "lead-triage.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: {{ include "lead-triage.fullname" . }}
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          # Readiness gates traffic, liveness restarts. They point at the same
+          # endpoint but answer different questions, so the thresholds differ:
+          # a slow start should delay traffic, not kill the pod.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          # Startup is where the schema is created and the database may still be
+          # coming up; the app retries internally for up to ten seconds, so give
+          # it thirty before liveness starts counting.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 3
+            failureThreshold: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            # The root filesystem is read-only, so anything that writes needs a
+            # mount. The app itself does not write when it runs on Postgres;
+            # Python still wants a writable temp directory.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      topologySpreadConstraints:
+        # Spread replicas across nodes so losing one does not take the service
+        # with it. ScheduleAnyway, because a single-node cluster - which is what
+        # CI runs - must still be able to place both pods.
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "lead-triage.selectorLabels" . | nindent 14 }}

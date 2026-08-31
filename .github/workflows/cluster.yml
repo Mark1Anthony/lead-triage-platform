@@ -1,0 +1,113 @@
+name: Cluster
+
+# Builds the image, brings up a real Kubernetes cluster, deploys the platform
+# with Terraform and checks it actually serves traffic - then tears it down.
+# Everything here runs on GitHub's free runners; no cloud resources are created.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The application lives in its own repository. Building it here rather
+      # than pulling a published tag means a change to either repo is tested
+      # against the current state of the other.
+      - name: Check out the application
+        uses: actions/checkout@v4
+        with:
+          repository: Mark1Anthony/lead-triage
+          path: app
+
+      - name: Create the cluster
+        uses: helm/kind-action@v1
+        with:
+          config: kind/cluster.yaml
+          cluster_name: lead-triage
+
+      - name: Install the ingress controller
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=180s
+
+      - name: Build the image and load it into the cluster
+        run: |
+          docker build -t lead-triage:ci ./app
+          # kind nodes have their own image store; without this the pods would
+          # try to pull from a registry and fail.
+          kind load docker-image lead-triage:ci --name lead-triage
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Deploy
+        working-directory: terraform/cluster
+        run: |
+          terraform init -input=false
+          terraform apply -auto-approve -input=false \
+            -var 'image_repository=lead-triage' \
+            -var 'image_tag=ci'
+
+      - name: The service answers, on Postgres
+        run: |
+          for i in $(seq 1 30); do
+            health=$(curl -fsS -H 'Host: lead-triage.localtest.me' http://localhost/health) && break
+            sleep 4
+          done
+          echo "$health"
+          echo "$health" | grep -q '"database":"postgres"' \
+            || { echo "expected postgres; the secret never reached the pod"; exit 1; }
+
+      - name: The dashboard renders and the seed ran
+        run: |
+          curl -fsS -H 'Host: lead-triage.localtest.me' http://localhost/ \
+            | grep -q "Nord Capital" \
+            || { echo "seed rows missing"; exit 1; }
+
+      - name: Writes are closed without the token
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE \
+            -H 'Host: lead-triage.localtest.me' http://localhost/leads/1)
+          [ "$code" = "401" ] || { echo "expected 401, got $code"; exit 1; }
+
+      - name: The token Terraform generated is the one that works
+        working-directory: terraform/cluster
+        run: |
+          token=$(terraform output -raw api_token)
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "X-Api-Token: $token" -H 'Host: lead-triage.localtest.me' \
+            http://localhost/api/leads)
+          [ "$code" = "200" ] || { echo "expected 200 with the token, got $code"; exit 1; }
+
+      - name: Rolling update keeps serving
+        run: |
+          kubectl -n lead-triage rollout restart deployment/lead-triage
+          kubectl -n lead-triage rollout status deployment/lead-triage --timeout=180s
+          curl -fsS -H 'Host: lead-triage.localtest.me' http://localhost/health > /dev/null \
+            || { echo "the service did not survive a restart"; exit 1; }
+
+      - name: What went wrong
+        if: failure()
+        run: |
+          kubectl -n lead-triage get pods,svc,ingress,pvc
+          kubectl -n lead-triage describe pods
+          kubectl -n lead-triage logs -l app.kubernetes.io/name=lead-triage --tail=100 || true
+          kubectl -n lead-triage logs -l app.kubernetes.io/name=postgres --tail=50 || true
+
+      - name: Tear down
+        if: always()
+        working-directory: terraform/cluster
+        run: terraform destroy -auto-approve -input=false || true
