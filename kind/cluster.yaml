@@ -2,15 +2,6 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: lead-triage
 
-networking:
-  # kindnet, the default, does not enforce NetworkPolicy the way a production
-  # CNI does - a correct policy was silently dropping the ingress controller's
-  # traffic. Calico is installed instead, so the policies in charts/ are really
-  # enforced here and the pipeline tests them rather than only rendering them.
-  # It is also what the AKS design uses.
-  disableDefaultCNI: true
-  podSubnet: "192.168.0.0/16"
-
 nodes:
   - role: control-plane
     # The ingress controller only schedules onto a node carrying this label,

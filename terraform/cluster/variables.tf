@@ -47,3 +47,13 @@ variable "replicas" {
     error_message = "At least one replica, or there is nothing to serve traffic."
   }
 }
+
+variable "network_policy_enabled" {
+  description = <<-EOT
+    Whether the charts install their NetworkPolicies. On by default, because a
+    cluster that enforces them is the normal case. CI turns it off: kind's CNI
+    accepts the policies and then drops traffic they permit.
+  EOT
+  type        = bool
+  default     = true
+}

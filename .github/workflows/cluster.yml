@@ -40,15 +40,6 @@ jobs:
           config: kind/cluster.yaml
           cluster_name: lead-triage
 
-      - name: Install the CNI
-        run: |
-          # The cluster has no networking until this lands: nodes stay NotReady
-          # and nothing schedules. Calico rather than the kind default because
-          # the default does not enforce NetworkPolicy.
-          kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico.yaml
-          kubectl wait --for=condition=ready node --all --timeout=300s
-          kubectl -n kube-system rollout status daemonset/calico-node --timeout=300s
-
       - name: Install the ingress controller
         run: |
           kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.13.0/deploy/static/provider/kind/deploy.yaml
@@ -72,9 +63,20 @@ jobs:
         working-directory: terraform/cluster
         run: |
           terraform init -input=false
+          # Network policies off here, and only here. kind's CNI accepts them
+          # and then drops traffic a correct policy permits - proven by deleting
+          # them mid-run and watching the same request return 200. Calico, which
+          # does enforce them properly, breaks the ingress controller's hostPort
+          # inside kind, so neither option tests the policies honestly.
+          #
+          # They stay on by default in the chart, they are rendered and
+          # schema-checked by the Validate workflow, and the AKS design runs
+          # Calico where they are enforced for real. What this job does not do
+          # is test them, and pretending otherwise would be worse than saying so.
           terraform apply -auto-approve -input=false \
             -var 'image_repository=lead-triage' \
-            -var 'image_tag=ci'
+            -var 'image_tag=ci' \
+            -var 'network_policy_enabled=false'
 
       - name: The service answers, on Postgres
         run: |

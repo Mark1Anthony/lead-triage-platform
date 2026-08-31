@@ -84,6 +84,9 @@ resource "helm_release" "postgres" {
       username       = local.db_username
       existingSecret = kubernetes_secret.postgres.metadata[0].name
     }
+    networkPolicy = {
+      enabled = var.network_policy_enabled
+    }
   })]
 }
 
@@ -106,6 +109,9 @@ resource "helm_release" "app" {
       enabled   = true
       className = "nginx"
       host      = var.ingress_host
+    }
+    networkPolicy = {
+      enabled = var.network_policy_enabled
     }
   })]
 
