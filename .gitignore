@@ -21,3 +21,6 @@ charts/**/charts/
 # Local
 .env
 *.kubeconfig
+
+# Written by scripts/bootstrap.sh - names an account, not infrastructure.
+backend.hcl
