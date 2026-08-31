@@ -52,10 +52,6 @@ jobs:
           # which is how this step failed once with nothing wrong.
           kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=300s
 
-          # Ready is still not serving. The webhook has to be reachable before
-          # an Ingress can be admitted at all.
-          kubectl -n ingress-nginx wait --for=condition=complete job \
-            --selector=app.kubernetes.io/component=admission-webhook --timeout=180s
 
       - name: Build the image and load it into the cluster
         run: |
@@ -79,7 +75,7 @@ jobs:
           # decides it.
           terraform apply -auto-approve -input=false \
             -var 'image_repository=lead-triage' \
-            -var 'image_tag=ci' \
+            -var 'image_tag=ci'
 
       - name: The service answers, on Postgres
         run: |
