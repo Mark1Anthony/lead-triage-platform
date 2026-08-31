@@ -46,12 +46,26 @@ jobs:
           # branch makes every run depend on what upstream merged that morning.
           kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.13.0/deploy/static/provider/kind/deploy.yaml
 
-          # rollout status rather than waiting on a pod condition: the admission
-          # webhook jobs run first and the controller image is large, so on a
-          # cold runner this takes longer than the 180s it used to be given -
-          # which is how this step failed once with nothing wrong.
+          # Pin the controller to the control-plane node. It reaches the host
+          # through hostPort, and kind/cluster.yaml publishes ports 80 and 443
+          # from that node only - so a controller scheduled onto a worker comes
+          # up healthy and is unreachable from outside. That is exactly what
+          # made this job pass and fail on identical commits: placement was not
+          # pinned, so it landed on the right node about half the time.
+          kubectl -n ingress-nginx patch deployment ingress-nginx-controller --type=strategic -p '{"spec":{"template":{"spec":{"nodeSelector":{"ingress-ready":"true"},"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}}}}'
+
+          # rollout status rather than a pod condition: the admission jobs run
+          # first and the image is large, so on a cold runner this takes longer
+          # than the 180s it was originally given.
           kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=300s
 
+          # Prove it landed where the ports are, rather than assuming.
+          node=$(kubectl -n ingress-nginx get pod -l app.kubernetes.io/component=controller -o jsonpath='{.items[0].spec.nodeName}')
+          echo "controller on: $node"
+          case "$node" in
+            *control-plane) ;;
+            *) echo "controller is not on the node that publishes ports 80/443"; exit 1 ;;
+          esac
 
       - name: Build the image and load it into the cluster
         run: |
