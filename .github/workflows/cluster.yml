@@ -40,6 +40,15 @@ jobs:
           config: kind/cluster.yaml
           cluster_name: lead-triage
 
+      - name: Install the CNI
+        run: |
+          # The cluster has no networking until this lands: nodes stay NotReady
+          # and nothing schedules. Calico rather than the kind default because
+          # the default does not enforce NetworkPolicy.
+          kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico.yaml
+          kubectl wait --for=condition=ready node --all --timeout=300s
+          kubectl -n kube-system rollout status daemonset/calico-node --timeout=300s
+
       - name: Install the ingress controller
         run: |
           kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.13.0/deploy/static/provider/kind/deploy.yaml
